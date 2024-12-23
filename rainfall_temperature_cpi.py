@@ -8,13 +8,13 @@ from datetime import date
 
 # Curah Hujan
 df_ch = pd.read_excel('Data/Data Curah Hujan 82 Kabupaten Kota ID BPS.xlsx',
-                      sheet_name='Bulanan 2009-2020')
+                      sheet_name='Bulanan 2009-2023')
 colnames_ch = list(df_ch.columns)
 colnames_bulan_ch = colnames_ch[3:]
 
 # Temperature
 df_suhu = pd.read_excel('Data/Data Temperature 82 Kabupaten Kota ID BPS.xlsx',
-                        sheet_name='Bulanan 2009-2020')
+                        sheet_name='Bulanan 2009-2023')
 colnames_suhu = list(df_suhu.columns)
 colnames_bulan_suhu = colnames_suhu[3:]
 
@@ -62,8 +62,13 @@ pd_melt_suhu = pd.melt(df_suhu, id_vars=['kode_bps', 'kota_low', 'dummy_kota'], 
 
 
 # Merge data curah hujan, temperature, dan cpi
-ihk = pd.read_excel('Data/Inflasi/Long Format CPI 82 Kab 2014 2019 2012=100.xlsx')
+ihk = pd.read_excel('Data/Inflasi/Long Format CPI 82 Kab 2014 2023 2012=100.xlsx')
 ihk['bulan'] = ihk['bulan'].dt.date
+ihk = ihk[['kode_bps', 'kota_low', 'bobot', 'bulan', 'tahun', 'composite', 'food', 'processed_food', 'housing']]
+
+# Hapus Bungo dari data karena Bungo tidak muncul di data setelah 2019
+ihk = ihk[ihk['kota_low'] != 'bungo']
+
 
 pd_melt_merge = pd.merge(pd_melt_ch, pd_melt_suhu[['kode_bps', 'kota_low', 'bulan', 'temperature']],
                          on=['kode_bps', 'kota_low', 'bulan'],
@@ -72,7 +77,7 @@ pd_melt_merge = pd.merge(pd_melt_ch, pd_melt_suhu[['kode_bps', 'kota_low', 'bula
 merge_all = pd.merge(pd_melt_merge, ihk,
                      on=['kode_bps', 'kota_low', 'bulan'],
                      how = 'inner')
-len(merge_all[merge_all['tahun']==2019]['kota_low'].unique()) == 82 # Kalau jumlahnya 82, berarti olah datanya benar
+len(merge_all[merge_all['tahun']==2023]['kota_low'].unique()) == 81 # Kalau jumlahnya 81, berarti olah datanya benar
 
 # Penentuan awal musim hujan
 # Badan Meteorologi Klimatologi dan Geofisika (BMKG) menetapkan awal musim hujan adalah 
@@ -121,11 +126,7 @@ result_median = df_merge_median.groupby(['kode_bps', 'kota_low', 'tahun', 'dummy
                                                                                                'composite': 'mean',
                                                                                                'food': 'mean',
                                                                                                'processed_food': 'mean',
-                                                                                               'housing': 'mean',
-                                                                                               'clothing': 'mean',
-                                                                                               'health': 'mean',
-                                                                                               'education_recreation_sport': 'mean',
-                                                                                               'transportation_communication_finance': 'mean'}).reset_index()
+                                                                                               'housing': 'mean'}).reset_index()
 
 df_merge_trend = pd.merge(merge_all, df_append[['bulan', 'kota_low', 'tahun', 'curah_hujan_cycle', 'curah_hujan_trend']],
                           on=['bulan', 'kota_low', 'tahun'],
@@ -139,12 +140,7 @@ result_trend = df_merge_trend.groupby(['kode_bps', 'kota_low', 'tahun', 'dummy_r
                                                                                                    'composite': 'mean',
                                                                                                    'food': 'mean',
                                                                                                    'processed_food': 'mean',
-                                                                                                   'housing': 'mean',
-                                                                                                   'clothing': 'mean',
-                                                                                                   'health': 'mean',
-                                                                                                   'education_recreation_sport': 'mean',
-                                                                                                   'transportation_communication_finance': 'mean'}).reset_index()
-
+                                                                                                   'housing': 'mean'}).reset_index()
 
 def rename_columns(df_input, suffix_input):
     
@@ -194,38 +190,15 @@ def export_dataframe(str_input):
     result_merge['housing_diff'] = (result_merge['housing_high'] - result_merge['housing_low'])*100 / result_merge['housing_low'] 
     result_merge['housing_mean'] = (result_merge['housing_high'] + result_merge['housing_low'])/2
 
-    result_merge['clothing_diff'] = (result_merge['clothing_high'] - result_merge['clothing_low'])*100 / result_merge['clothing_low'] 
-    result_merge['clothing_mean'] = (result_merge['clothing_high'] + result_merge['clothing_low'])/2
-
-    result_merge['health_diff'] = (result_merge['health_high'] - result_merge['health_low'])*100 / result_merge['health_low'] 
-    result_merge['health_mean'] = (result_merge['health_high'] + result_merge['health_low'])/2
-
-    result_merge['education_recreation_sport_diff'] = (result_merge['education_recreation_sport_high'] - result_merge['education_recreation_sport_low'])*100 / result_merge['education_recreation_sport_low'] 
-    result_merge['education_recreation_sport_mean'] = (result_merge['education_recreation_sport_high'] + result_merge['education_recreation_sport_low'])/2
-
-    result_merge['transportation_communication_finance_diff'] = (result_merge['transportation_communication_finance_high'] - result_merge['transportation_communication_finance_low'])*100 / result_merge['transportation_communication_finance_low'] 
-    result_merge['transportation_communication_finance_mean'] = (result_merge['transportation_communication_finance_high'] + result_merge['transportation_communication_finance_low'])/2
-    
     result_merge['composite_lag1'] = result_merge.groupby('kode_bps')['composite_mean'].shift(1)
     result_merge['inflasi_t'] = (result_merge['composite_mean'] - result_merge['composite_lag1'])*100 / result_merge['composite_lag1'] 
     result_merge['inflasi_lag1'] = result_merge.groupby('kode_bps')['inflasi_t'].shift(1)
     
     result_merge[['inflasi_t', 'inflasi_lag1']]
-    result_merge.to_excel(f'Data/Curah Hujan dan IHK 2012=100 Dummy {str_input}.xlsx', index=False)
+    result_merge.to_excel(f'Data/Curah Hujan dan IHK 2012=100 Dummy {str_input} 2014 2023.xlsx', index=False)
     
     return(result_merge)
 
 df_median_result = export_dataframe('median')
 df_trend_result = export_dataframe('trend')
-
-
-
-
-
-
-
-
-
-
-
 
