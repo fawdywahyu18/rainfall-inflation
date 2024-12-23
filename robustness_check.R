@@ -10,11 +10,78 @@ library(fdrtool)
 wd = ""
 setwd(wd)
 
-data_panel_median = read_excel('Data/panel data long 2012=100 Dummy median.xlsx')
-data_cs_median = read_excel('Data/cross section data 2012=100 Dummy median.xlsx')
+#================================================================TWFE 2023==========================================================================#
 
-data_panel_trend = read_excel('Data/panel data long 2012=100 Dummy trend.xlsx')
-data_cs_trend = read_excel('Data/cross section data 2012=100 Dummy trend.xlsx')
+data_panel_2023_median = read_excel('Data/panel data long 2012=100 Dummy median 2014 2023.xlsx')
+data_cs_2023_median = read_excel('Data/cross section data 2012=100 Dummy median 2014 2023.xlsx')
+
+data_panel_2023_trend = read_excel('Data/panel data long 2012=100 Dummy trend 2014 2023.xlsx')
+data_cs_2023_trend = read_excel('Data/cross section data 2012=100 Dummy trend 2014 2023.xlsx')
+
+data_panel_2023_trend$dummy_kota = factor(data_panel_2023_trend$dummy_kota)
+data_panel_2023_trend$percentile_group_pertanian = factor(data_panel_2023_trend$percentile_group_pertanian)
+
+data_panel_2023_trend = data_panel_2023_trend %>%
+  group_by(kode_bps) %>%
+  mutate(inflasi_lag1 = na_interpolation(inflasi_lag1, option = "linear"))
+
+# Tambahkan variabel dummy untuk COVID-19 (2020–2023)
+data_panel_2023_trend <- data_panel_2023_trend %>%
+  mutate(covid_dummy = ifelse(tahun >= 2020, 1, 0))
+
+composite_tw_2023 = plm(composite_diff ~ curah_hujan_diff + temperature_diff + share_pertanian + log_pdrb + share_industri + deflator_pertanian_growth + deflator_industri_growth + inflasi_lag1,
+                        data=data_panel_2023_trend,
+                        index=c('kode_bps', 'tahun'),
+                        model='within',
+                        effect = 'twoway')
+
+composite_tw_se_2023 = coef_test(composite_tw_2023, vcov = "CR1", cluster = data_panel_2023_trend$kode_bps, test = "naive-t")$SE
+coef_test(composite_tw_2023, vcov = "CR1", cluster = data_panel_2023_trend$kode_bps, test = "naive-t")
+
+food_tw_2023 = plm(food_diff ~ curah_hujan_diff + temperature_diff + log_pdrb + share_pertanian + share_industri + deflator_pertanian_growth + deflator_industri_growth + inflasi_lag1,
+                   data=data_panel_2023_trend,
+                   index=c('kode_bps', 'tahun'),
+                   model='within',
+                   effect = 'twoway')
+
+food_tw_se_2023 = coef_test(food_tw_2023, vcov = "CR1", cluster = data_panel_2023_trend$kode_bps, test = "naive-t")$SE
+coef_test(food_tw_2023, vcov = "CR1", cluster = data_panel_2023_trend$kode_bps, test = "naive-t")
+
+processed_food_tw_2023 = plm(processed_food_diff ~ curah_hujan_diff + temperature_diff + share_pertanian + log_pdrb + share_industri + deflator_pertanian_growth + deflator_industri_growth + inflasi_lag1,
+                             data=data_panel_2023_trend,
+                             index=c('kode_bps', 'tahun'),
+                             model='within',
+                             effect = 'twoway')
+
+processed_food_tw_se_2023 = coef_test(processed_food_tw_2023, vcov = "CR1", cluster = data_panel_2023_trend$kode_bps, test = "naive-t")$SE
+coef_test(processed_food_tw_2023, vcov = "CR1", cluster = data_panel_2023_trend$kode_bps, test = "naive-t")
+
+housing_tw_2023 = plm(housing_diff ~ curah_hujan_diff + temperature_diff + share_pertanian + log_pdrb + share_industri + deflator_pertanian_growth + deflator_industri_growth + inflasi_lag1,
+                      data=data_panel_2023_trend,
+                      index=c('kode_bps', 'tahun'),
+                      model='within',
+                      effect = 'twoway')
+
+housing_tw_se_2023 = coef_test(housing_tw_2023, vcov = "CR1", cluster = data_panel_2023_trend$kode_bps, test = "naive-t")$SE
+coef_test(housing_tw_2023, vcov = "CR1", cluster = data_panel_2023_trend$kode_bps, test = "naive-t")
+
+library(stargazer)
+stargazer(composite_tw_2023, food_tw_2023, processed_food_tw_2023,
+          se=list(composite_tw_se_2023, food_tw_se_2023, processed_food_tw_se_2023), 
+          type = 'html',
+          out = 'Tabel Robustness Check 2023 Regresi Fixed Effect Part 1 tex.html', no.space = TRUE, align = TRUE,
+          omit.stat=c("LL","ser","f"))
+
+stargazer(housing_tw_2023,
+          se=list(housing_tw_se_2023), 
+          type = 'html',
+          out = 'Tabel Robustness Check 2023 Regresi Fixed Effect Part 2 tex.html', no.space = TRUE, align = TRUE,
+          omit.stat=c("LL","ser","f"))
+
+
+
+
+#================================================================TWFE UTAMA==========================================================================#
 
 
 # Create new variable of each weight for each sub index
@@ -80,43 +147,61 @@ housing_tw = plm(housing_diff ~ curah_hujan_diff + temperature_diff + share_pert
 
 housing_tw_se = coef_test(housing_tw, vcov = "CR1", cluster = data_panel_trend$kode_bps, test = "naive-t")$SE
 
-clothing_tw = plm(clothing_diff ~ curah_hujan_diff + temperature_diff + share_pertanian + log_pdrb + share_industri + deflator_pertanian_growth + deflator_industri_growth + inflasi_lag1,
-                  data=data_panel_trend,
-                  index=c('kode_bps', 'tahun'),
-                  model='within',
-                  effect = 'twoway',
-                  weights = bobot)
-clothing_tw_se = coef_test(clothing_tw, vcov = "CR1", cluster = data_panel_trend$kode_bps, test = "naive-t")$SE
-
-health_tw = plm(health_diff ~ curah_hujan_diff + temperature_diff + share_pertanian + log_pdrb + share_industri + deflator_pertanian_growth + deflator_industri_growth + inflasi_lag1,
-                data=data_panel_trend,
-                index=c('kode_bps', 'tahun'),
-                model='within',
-                effect = 'twoway',
-                weights = bobot)
-health_tw_se = coef_test(health_tw, vcov = "CR1", cluster = data_panel_trend$kode_bps, test = "naive-t")$SE
-
-education_recreation_sport_tw = plm(education_recreation_sport_diff ~ curah_hujan_diff + temperature_diff + share_pertanian + log_pdrb + share_industri + deflator_pertanian_growth + deflator_industri_growth + inflasi_lag1,
-                                    data=data_panel_trend,
-                                    index=c('kode_bps', 'tahun'),
-                                    model='within',
-                                    effect = 'twoway',
-                                    weights = bobot)
-education_recreation_sport_tw_se = coef_test(education_recreation_sport_tw, vcov = "CR1", cluster = data_panel_trend$kode_bps, test = "naive-t")$SE
 
 library(stargazer)
 stargazer(composite_tw, food_tw, processed_food_tw, housing_tw,
           se=list(composite_tw_se, food_tw_se, processed_food_tw_se, housing_tw_se), 
           type = 'html',
-          out = 'Laporan/Robustness Check/TWFE Bobot/Tabel Robustness Check Regresi Fixed Effect Part 1 tex.html', no.space = TRUE, align = TRUE,
+          out = 'Tabel Robustness Check Weighted Regresi Fixed Effect Part 1 tex.html', no.space = TRUE, align = TRUE,
           omit.stat=c("LL","ser","f"))
 
-stargazer(clothing_tw, health_tw, education_recreation_sport_tw,
-          se=list(clothing_tw_se, health_tw_se, education_recreation_sport_tw_se), 
+#================================================================TWFE HETERO==========================================================================#
+composite_tw_hetero = plm(composite_diff ~ curah_hujan_diff + curah_hujan_diff:percentile_group_pertanian  + temperature_diff + share_pertanian + log_pdrb + share_industri + deflator_pertanian_growth + deflator_industri_growth + inflasi_lag1,
+                          data=data_panel_trend,
+                          index=c('kode_bps', 'tahun'),
+                          model='within',
+                          effect = 'twoway')
+
+composite_tw_hetero_se = coef_test(composite_tw_hetero, vcov = "CR1", cluster = data_panel_trend$kode_bps, test = "naive-t")$SE
+
+food_tw_hetero = plm(food_diff ~ curah_hujan_diff + curah_hujan_diff:percentile_group_pertanian + temperature_diff + log_pdrb + share_pertanian + share_industri + deflator_pertanian_growth + deflator_industri_growth + inflasi_lag1,
+                    data=data_panel_trend,
+                    index=c('kode_bps', 'tahun'),
+                    model='within',
+                    effect = 'twoway')
+
+food_tw_hetero_se = coef_test(food_tw_hetero, vcov = "CR1", cluster = data_panel_trend$kode_bps, test = "naive-t")$SE
+
+processed_food_tw_hetero = plm(processed_food_diff ~ curah_hujan_diff + curah_hujan_diff:percentile_group_pertanian + temperature_diff + share_pertanian + log_pdrb + share_industri + deflator_pertanian_growth + deflator_industri_growth + inflasi_lag1,
+                              data=data_panel_trend,
+                              index=c('kode_bps', 'tahun'),
+                              model='within',
+                              effect = 'twoway')
+
+processed_food_tw_hetero_se = coef_test(processed_food_tw_hetero, vcov = "CR1", cluster = data_panel_trend$kode_bps, test = "naive-t")$SE
+
+housing_tw_hetero = plm(housing_diff ~ curah_hujan_diff + curah_hujan_diff:percentile_group_pertanian + temperature_diff + share_pertanian + log_pdrb + share_industri + deflator_pertanian_growth + deflator_industri_growth + inflasi_lag1,
+                       data=data_panel_trend,
+                       index=c('kode_bps', 'tahun'),
+                       model='within',
+                       effect = 'twoway')
+
+housing_tw_hetero_se = coef_test(housing_tw_hetero, vcov = "CR1", cluster = data_panel_trend$kode_bps, test = "naive-t")$SE
+
+
+library(stargazer)
+stargazer(composite_tw_hetero, food_tw_hetero, processed_food_tw_hetero, housing_tw_hetero,
+          se=list(composite_tw_hetero_se, food_tw_hetero_se, processed_food_tw_hetero_se, housing_tw_hetero_se), 
           type = 'html',
-          out = 'Laporan/Robustness Check/TWFE Bobot/Tabel Robustness Check Regresi Fixed Effect Part 2 tex.html', no.space = TRUE, align = TRUE,
+          out = 'Tabel Robustness Check Hetero Regresi Fixed Effect Part 1 tex.html', no.space = TRUE, align = TRUE,
           omit.stat=c("LL","ser","f"))
 
+
+stargazer(housing_tw_hetero,
+          se=list(housing_tw_hetero_se), 
+          type = 'html',
+          out = 'Tabel Robustness Check Hetero Regresi Fixed Effect Housing tex.html', no.space = TRUE, align = TRUE,
+          omit.stat=c("LL","ser","f"))
 
 #================================================================TWFE PLACEBO==========================================================================#
 
@@ -136,7 +221,7 @@ for (i in 1:num_iterations) {
   data_panel_trend$curah_hujan_diff_placebo = sample(data_panel_trend$curah_hujan_diff)
   
   # Fit the placebo regression model
-  model_placebo <- plm(education_recreation_sport_diff ~ curah_hujan_diff_placebo + temperature_diff + share_pertanian + log_pdrb + share_industri + deflator_pertanian_growth + deflator_industri_growth + inflasi_lag1,
+  model_placebo <- plm(composite_diff ~ curah_hujan_diff_placebo + temperature_diff + share_pertanian + log_pdrb + share_industri + deflator_pertanian_growth + deflator_industri_growth + inflasi_lag1,
                        data=data_panel_trend,
                        index=c('kode_bps', 'tahun'),
                        model='within',
@@ -155,7 +240,8 @@ significant_count <- sum(p_values < 0.05)
 cat("Number of significant placebo tests (p < 0.05) after 100 iterations:", significant_count, "\n")
 
 # Plot the distribution of p-values
-hist(p_values, main = "p-values from Placebo Tests Education, Recreation & Sport", xlab = "p-value", breaks = 20)
+hist(p_values, main = "p-values from Placebo Tests", xlab = "p-value", breaks = 20)
+
 
 
 
